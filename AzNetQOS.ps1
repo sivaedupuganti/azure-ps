@@ -46,7 +46,7 @@ param(
 Import-Module Azure
 
 # Source necessary functions
-. .\Functions.ps1
+. .\AzureFunctions.ps1
 
 if ($configMode -eq "ASM") {
     Switch-AzureMode AzureServiceManagement
@@ -141,6 +141,19 @@ if ($osType -ne "Windows") {
 # Create a credential object to be used to logon to the VMs
 $credential = Get-CredentialFromParams -adminUser $adminUser -adminPasswd $adminPasswd
 Write-Verbose "Credential object created with username $adminUser"
+
+# Wait until VMs are ready
+ForEach ($vmName in $vmNames) {
+    $vm = Get-AzureVM -ServiceName $serviceName | where {$_.Name -eq $vmName}
+    while ($vm.InstanceStatus -ne "ReadyRole") {
+        Write-Verbose ("VM $vmName not ready (instance status: {0}), waiting for 10 seconds" -f $vm.InstanceStatus)
+        Start-Sleep -s 10
+
+        $vm = Get-AzureVM -ServiceName $serviceName | where {$_.Name -eq $vmName}
+    }
+
+    Write-Verbose "VM $vmName in ready state"
+}
 
 # Get PS sessions to the VMs
 $vmSessions = @{}

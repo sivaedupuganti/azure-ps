@@ -325,10 +325,10 @@ Function New-BandwidthTest()
     Start-Sleep -S 30
 
     # Measure Network statistics on sender 
-    $senderBW = Get-VMBandwidth -vmSession $vmSessions[$senderVMName] -duration 0.1
+    $senderBW = Get-RemoteVMBandwidth -psSession $vmSessions[$senderVMName] -duration 0.1
 
     # Measure Network statistics on receiver
-    $receiverBW = Get-VMBandwidth -vmSession $vmSessions[$receiverVMName] -duration 0.1
+    $receiverBW = Get-RemoteVMBandwidth -psSession $vmSessions[$receiverVMName] -duration 0.1
 
     return @{"sentGbps" = $senderBW['sentGbps']; "receivedGbps" = $receiverBW['receivedGbps']}
 }
@@ -405,13 +405,13 @@ Function New-TestVMInVnet()
     $resourceGroupName = $serviceName
 
     # Setup Resource Group
-    $resourceGroup = Get-AzureResourceGroup -Name $resourceGroupName
+    $resourceGroup = Get-AzureResourceGroup -Name $resourceGroupName -ErrorAction SilentlyContinue
     if (!$resourceGroup) {
         New-AzureResourceGroup -Name $resourceGroupName -Location $location
     }
 
     # Check if VM already exists
-    $vm = Get-AzureVM -Name $vmName -ResourceGroupName $resourceGroupName
+    $vm = Get-AzureVM -Name $vmName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue
     if ($vm) {
         Write-Host "VM $vmName already exists. Nothing more to do."
         return
@@ -434,14 +434,14 @@ Function New-TestVMInVnet()
 
     # Setup network resources
     ## Create public IP to access VM
-    $publicIP = Get-AzurePublicIpAddress -Name $interfaceName -ResourceGroupName $resourceGroupName
+    $publicIP = Get-AzurePublicIpAddress -Name $interfaceName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue
     if (!$publicIP) {
         $publicIP = New-AzurePublicIpAddress -Name $interfaceName -ResourceGroupName $resourceGroupName -Location $location -AllocationMethod Dynamic
     }
 
     
     ## Create VNET
-    $vnet = Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $resourceGroupName
+    $vnet = Get-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue
     if (!$vnet) {
         $vnet = New-AzureVirtualNetwork -Name $vnetName -ResourceGroupName $resourceGroupName -Location $location -AddressPrefix $vnetPrefix
 
@@ -451,7 +451,7 @@ Function New-TestVMInVnet()
 
     
     ## Create NIC
-    $interface = Get-AzureNetworkInterface -Name $interfaceName -ResourceGroupName $resourceGroupName
+    $interface = Get-AzureNetworkInterface -Name $interfaceName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue
     if (!$interface) {
         $interface = New-AzureNetworkInterface -Name $interfaceName -ResourceGroupName $resourceGroupName -Location $location -SubnetId $vnet.Subnets[0].Id -PublicIpAddressId $publicIP.Id
     }
@@ -512,7 +512,6 @@ Function New-TestVMInVnet()
     $vm = Set-AzureVMOSDisk -VM $vm -Name $osDiskName -VhdUri $osDiskUri -CreateOption FromImage
 
     ## Create the VM
-    $vm
     New-AzureVM -VM $vm -ResourceGroupName $resourceGroupName -Location $location 
 
     return $resourceGroupName
