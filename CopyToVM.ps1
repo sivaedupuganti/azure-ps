@@ -90,7 +90,7 @@ function Send-File
 
     if ($abort -eq $true)
     {
-        Write-Host 'Ignored file transfer - already exists'
+        Write-Verbose 'Ignored file transfer - already exists'
         return
     }
 

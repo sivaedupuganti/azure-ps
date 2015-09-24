@@ -175,13 +175,13 @@ ForEach ($vmName in $vmNames)
 Get-AzureVMSession -vmNames $vmNames -serviceName $serviceName -vmSessions $vmSessions -credential $credential -configMode $configMode
 $result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[0] -senderVMName $vmNames[1] -vmSessions $vmSessions
 
-Write-Host "Sender bandwidth (Gbps): $sentGbps, Receiver bandwidth (Gbps): $receivedGbps"
+Write-Host ("Sender bandwidth (Gbps): {0}, Receiver bandwidth (Gbps): {1}" -f $result["sentGbps"], $result["receivedGbps"])
 
 # Execute test from VM0 to VM1
 Get-AzureVMSession -vmNames $vmNames -serviceName $serviceName -vmSessions $vmSessions -credential $credential -configMode $configMode
 $result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[1] -senderVMName $vmNames[0] -vmSessions $vmSessions
 
-Write-Host "Sender bandwidth (Gbps): $sentGbps, Receiver bandwidth (Gbps): $receivedGbps"
+Write-Host ("Sender bandwidth (Gbps): {0}, Receiver bandwidth (Gbps): {1}" -f $result["sentGbps"], $result["receivedGbps"])
 
 # Clean up resources unless explicitly requested
 if ($noCleanUp -ne $true) {
