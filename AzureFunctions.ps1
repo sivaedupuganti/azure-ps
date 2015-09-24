@@ -1,5 +1,58 @@
 ﻿. .\CommonFunctions.ps1
 
+<#
+.SYNOPSIS
+Creates a self-signed certificate for the given vmName with the specific password.
+Returns the json-encoded secure string containing certificate & its password, 
+which can be stored as secret in Azure key vault
+#>
+Function Get-AzureVMCertSecret()
+{
+    param([parameter(mandatory=$true)][string] $vmName,
+          [parameter(mandatory=$true)][string] $certPasswd)
+
+    $certLocation = "cert:\LocalMachine\My"
+    $certFilePath = "$env:TEMP\$vmName.pfx"
+
+    if((IsAdmin) -eq $false)
+	{
+		Write-Error "Must run PowerShell elevated to create certificate."
+		return
+	}
+
+    $cert = Get-ChildItem -path $certLocation -DnsName $vmName
+    if (!$cert) {
+        New-SelfSignedCertificate -certstorelocation cert:\localmachine\my -dnsname $vmName
+        $cert = Get-ChildItem -path cert:\LocalMachine\My -DnsName $vmName
+    }
+
+    $certThumbprint = $cert.Thumbprint
+
+    $certPasswdSec = ConvertTo-SecureString -String $certPasswd -Force -AsPlainText
+    Export-PfxCertificate -cert "$certLocation\$certThumbprint" -FilePath $certFilePath -Password $certPasswdSec | Out-Null
+
+    $certFileBytes = Get-Content $certFilePath -Encoding Byte
+    $certFileEncoded = [System.Convert]::ToBase64String($certFileBytes)
+
+    $jsonObject = @"
+{
+"data": "$certFileEncoded",
+"dataType" :"pfx",
+"password": "$certPasswd"
+}
+"@
+
+    $jsonObjectBytes = [System.Text.Encoding]::UTF8.GetBytes($jsonObject)
+    $jsonEncoded = [System.Convert]::ToBase64String($jsonObjectBytes)
+
+    $secret = ConvertTo-SecureString -String $jsonEncoded -AsPlainText –Force
+
+    # Delete certificate file
+    Remove-Item $certFilePath
+
+    return $secret
+}
+
 Function Create-BasicResources()
 {
     param([parameter(mandatory=$true)][string] $configMode,
