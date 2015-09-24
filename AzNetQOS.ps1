@@ -43,10 +43,14 @@ param(
     [bool] $noCleanUp
 )
 
-Import-Module Azure
-
 # Source necessary functions
 . .\AzureFunctions.ps1
+
+if((IsAdmin) -eq $false)
+{
+	Write-Error "Must run PowerShell elevated to install/manage WinRM certificates"
+	exit
+}
 
 if ($configMode -eq "ASM") {
     Switch-AzureMode AzureServiceManagement
