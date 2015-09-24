@@ -93,10 +93,15 @@ Function Create-BasicResources()
         $secret = Get-AzureKeyVaultSecret -VaultName $vaultName -Name $secretName -ErrorAction SilentlyContinue
         if (!$secret) {
             # Get json-encoded secure string containing a self-signed cert & its password
-            $secretvalue = Get-AzureVMCertSecret -vmName $certDNSName -certPasswd $certPasswd
+            $secretValue = Get-AzureVMCertSecret -vmName $certDNSName -certPasswd $certPasswd
+
+            if (!$secretValue) {
+                Write-Error "Unable to get secret value to be stored into key vault"
+                return
+            }
 
             # Add json-encoded secure string into key vault as the secret to be used for WinRMHttpsUrl
-            $secret = Set-AzureKeyVaultSecret -VaultName $vaultName -Name $secretName -SecretValue $secretvalue
+            $secret = Set-AzureKeyVaultSecret -VaultName $vaultName -Name $secretName -SecretValue $secretValue
         }
                
 
@@ -242,11 +247,13 @@ Function Create-AzureVMSession()
             Write-Error ("Unable to find VM $vmName in resource group $serviceName")
             return
         }
+
+        $publicIpAddress = Get-AzureVMPublicIpAddress -vmName $vmName -resourceGroupName $resourceGroupName 
         
         $sessionOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
 
         Write-Verbose ("Create a PS session to the VM $vmName")
-        $vmSession = New-PSSession -ComputerName $vm.IpAddress -UseSSL -SessionOption $sessionOptions -Credential $credential
+        $vmSession = New-PSSession -ComputerName $publicIpAddress -UseSSL -SessionOption $sessionOptions -Credential $credential
     }
 
     if (!$vmSession) {
@@ -275,14 +282,19 @@ Function Get-AzureVMSession()
         # Check if VM is in ready state
         if ($configMode -eq "ASM") {
             $vm = Get-AzureVM -ServiceName $serviceName | where {$_.Name -eq $vmName}
+
+            if ($vm.InstanceStatus -ne "ReadyRole") {
+                Write-Verbose "VM $vmName not ready to connect. Instance status: $vm.InstanceStatus. SKipping this one."
+                continue
+            }
         } else {
             $vm = Get-AzureVM -Name $vmName -ResourceGroupName $serviceName 
+            if ($vm.ProvisioningState -ne "Succeeded"){
+                Write-Verbose "VM $vmName not ready to connect. Instance status: $vm.InstanceStatus. SKipping this one."
+                continue
+            }
         }
 
-        if ($vm.InstanceStatus -ne "ReadyRole") {
-            Write-Verbose "VM $vmName not ready to connect. Instance status: $vm.InstanceStatus. SKipping this one."
-            continue
-        }
 
         $vmSessions[$vmName] = Create-AzureVMSession -serviceName $serviceName -vmName $vmName -credential $credential -configMode $configMode
     }
@@ -292,7 +304,10 @@ Function Get-AzureVMSession()
 # Configure Test VM
 Function Configure-TestVM() 
 {
-    param([string] $serviceName, [string] $vmName, $remoteAddress, $vmSessions)
+    param([parameter(mandatory=$true)][string] $serviceName, 
+          [parameter(mandatory=$true)][string] $vmName, 
+          [parameter(mandatory=$true)] $vmSessions,
+          [string[]] $remoteAddress)
 
     if (!($vmSessions -and $vmSessions[$vmName] -and $vmSessions[$vmName].State -eq "Opened")) {
         Write-Error "Cannot configure $vmName. No active PS session found"
@@ -327,12 +342,18 @@ Function Configure-TestVM()
         Set-NetAdapterAdvancedProperty -Name "Ethernet" -DisplayName "Receive Buffer Size" -DisplayValue "16MB"
         Set-NetAdapterAdvancedProperty -Name "Ethernet" -DisplayName "Send Buffer Size" -DisplayValue "128MB"
     }
+
+    return $true
 }
 
 
 Function New-BandwidthTest()
 {
-    param([string] $serviceName, [string] $senderVMName, [string] $receiverVMName, $vmSessions)
+    param([parameter(mandatory=$true)][string] $serviceName,
+          [parameter(mandatory=$true)][string] $senderVMName,
+          [parameter(mandatory=$true)][string] $receiverVMName,
+          [parameter(mandatory=$true)][string] $configMode, 
+          [parameter(mandatory=$true)] $vmSessions)
    
     # Copy NTTTCP to VMs
     $localPath=".\NTttcp-v5.31\x64\ntttcp.exe"
@@ -356,8 +377,17 @@ Function New-BandwidthTest()
     }
 
     # Find IP address of Receiver
-    $vm = Get-AzureVM -ServiceName $serviceName | where {$_.Name -eq $receiverVMName}
-    $receiverIpAddress = $vm.IpAddress
+    if ($configMode -eq "ASM") {
+        $vm = Get-AzureVM -ServiceName $serviceName | where {$_.Name -eq $receiverVMName}
+        $receiverIpAddress = $vm.IpAddress
+    } else {
+        $receiverIpAddress = Get-AzureVMPublicIpAddress -vmName $receiverVMName -resourceGroupName $serviceName
+    }
+
+    if (!$receiverIpAddress) {
+        Write-Error "Cannot start Ntttcp.exe without receiverIpAddress ($receiverIpAddress)"
+        return
+    }
 
     # Start NTTTCP on Receiver
     Write-Verbose "Starting ntttcp.exe on receiver"
@@ -388,7 +418,7 @@ Function New-BandwidthTest()
 
 Function Get-AzureVMImageProps()
 {
-    param($osType)
+    param([parameter(mandatory=$true)][string] $osType)
 
     if ($osType -eq "CentOS") {
         $publisherName = "openlogic"
@@ -466,7 +496,7 @@ Function New-TestVMInVnet()
     # Check if VM already exists
     $vm = Get-AzureVM -Name $vmName -ResourceGroupName $resourceGroupName -ErrorAction SilentlyContinue
     if ($vm) {
-        Write-Host "VM $vmName already exists. Nothing more to do."
+        Write-Host "VM $vmName already exists"
         return
     }
 
@@ -567,7 +597,25 @@ Function New-TestVMInVnet()
     ## Create the VM
     New-AzureVM -VM $vm -ResourceGroupName $resourceGroupName -Location $location 
 
-    return $resourceGroupName
+    return
+}
+
+Function Get-AzureVMPublicIpAddress()
+{
+    param([parameter(mandatory=$true)][string] $vmName,
+          [parameter(mandatory=$true)][string] $resourceGroupName)
+    
+    $vm = Get-AzureVM -Name $vmName -ResourceGroupName $resourceGroupName
+
+    if (!$vm) {
+        Write-Error "Unable to find public IP for $vmName"
+        return
+    }
+
+    $interfaceName = $vm.NetworkProfile.NetworkInterfaces[0].ReferenceUri.split('/')[-1]
+    $publicIP = Get-AzurePublicIpAddress -Name $interfaceName -ResourceGroupName $resourceGroupName 
+
+    return $publicIP.IpAddress
 }
 
 Function Remove-TestService()
