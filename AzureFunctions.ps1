@@ -14,7 +14,8 @@ Function Create-BasicResources()
         $vaultName = "aznetqos-vault"
         $secretName = "aznetqos-vm-winrmcerturl"
         $certDNSName = "aznetqos-vm"
-        ## TODO: Fix hardcoding of cert password
+        
+        ## TODO: Remove hard coded cert password
         $certPasswd = "AzureVMC3rtPa%%wd"
 
         
@@ -192,7 +193,7 @@ Function Create-AzureVMSession()
         $sessionOptions = New-PSSessionOption -SkipCACheck -SkipCNCheck -SkipRevocationCheck
 
         Write-Verbose ("Create a PS session to the VM $vmName")
-        $vmSession = New-PSSession -ComputerName $vm.IpAddress -UseSSL -Credential $credential
+        $vmSession = New-PSSession -ComputerName $vm.IpAddress -UseSSL -SessionOption $sessionOptions -Credential $credential
     }
 
     if (!$vmSession) {
@@ -281,7 +282,7 @@ Function New-BandwidthTest()
     param([string] $serviceName, [string] $senderVMName, [string] $receiverVMName, $vmSessions)
    
     # Copy NTTTCP to VMs
-    $localPath="C:\Azure\PS\NTttcp-v5.31\x64\ntttcp.exe"
+    $localPath=".\NTttcp-v5.31\x64\ntttcp.exe"
     $remotePath="D:\NTttcp-v5.31\x64\ntttcp.exe"
 
     # Source script with functions to copy files to Azure VM
@@ -377,16 +378,13 @@ Function New-TestVMInVnet()
         [parameter(mandatory=$true)][string]$location,
         [parameter(mandatory=$true)][string]$serviceName,
         [parameter(mandatory=$true)][string]$osType,
+        [string]$vmName,
+        [string]$instanceSize = "Standard_D4",
         
-        [parameter(mandatory=$true)][string]$storageAccount,
-        
+        [string]$adminUser = "azureuser",
         [string]$sshPublicKeyPath,
         [string]$adminPasswd,
-        [string]$winRMCertUrl,
         
-        [string]$vmName,
-        [string]$adminUser = "azureuser",
-        [string]$instanceSize = "Standard_D4",
         [string]$vnetPrefix = "192.168.0.0/16",
         [string]$defaultSubnetName = "default",
         [string]$defaultSubnetPrefix = "192.168.1.0/24",
@@ -479,17 +477,19 @@ Function New-TestVMInVnet()
         }
 
         # Get certificate details to be used for WinRMHttps
-        $certInfo = Get-AzureVMCertInfo -vmName $vmName -resourceGroupName $resourceGroupName
+        if (!$winRMCertInfo.vaultId -or !$winRMCertInfo.certUrl) {
+            Write-Error "Unable to find cert information to be used to enable WinRMHttps"
+            return
+        }
 
         # Use self-signed certificate for WinRM Https
         $vm = Set-AzureVMOperatingSystem -VM $vm -Windows -ComputerName $vmName -Credential $credential `
                                          -ProvisionVMAgent -EnableAutoUpdate `
-                                         -WinRMHttps -WinRMCertificateUrl $certInfo.certUri
+                                         -WinRMHttps -WinRMCertificateUrl $winRMCertInfo.certUrl
 
         
-
         # Add self-signed certificate to VM
-        $vm = Add-AzureVMSecret -VM $vm  -SourceVaultId $certInfo.vaultId -CertificateStore "My" -CertificateUrl $certInfo.certUri
+        $vm = Add-AzureVMSecret -VM $vm  -SourceVaultId $winRMCertInfo.vaultId -CertificateStore "My" -CertificateUrl $winRMCertInfo.certUrl
 
     } elseif ($osType -eq "CentOS" -or $osType -eq "Ubuntu") {
         $vm = Set-AzureVMOperatingSystem -VM $vm -Linux -ComputerName $vmName -Credential $credential

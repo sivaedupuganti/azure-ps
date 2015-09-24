@@ -31,7 +31,7 @@ param(
     [string] $adminPasswd,
 
     # SSH public key to be setup on VMs (only when osType is not Windows).
-    [string] $sshPublicKeyPath = "C:\cygwin64\home\sivae\.ssh\id_rsa.pub",
+    [string] $sshPublicKeyPath,
 
     # Location where resources will be created
     [string] $mylocation = "East US 2",
@@ -65,11 +65,6 @@ Write-Verbose "Selecting the subscription to be used"
 Select-AzureSubscription -SubscriptionId $subscriptionId –Current
 
 # Create basic resources
-
-$subscriptionId="c93ec8ae-b729-4f83-9c3c-601078f825d8"
-$mylocation = "East US 2"
-$configMode = "ARM"
-
 Create-BasicResources -configMode $configMode -subscriptionId $subscriptionId -location $mylocation
 
 if ($configMode -eq "ASM") {
@@ -114,9 +109,9 @@ ForEach ($vmName in $vmNames) {
         # Use ARM location style
         $location = $mylocation.ToLower().Replace(" ","")
 
-        $resourceGroupName = New-TestVMInVnet -location $location -serviceName $serviceName -osType $osType -vmName $vmName `
-                                              -instanceSize $instanceSize -storageAccount $storageAccountName `
-                                              -adminUser $adminUser -sshPublicKeyPath $sshPublicKeyPath
+        $resourceGroupName = New-TestVMInVnet -serviceName $serviceName -vmName $vmName -instanceSize $instanceSize `
+                                              -osType $osType -location $location  -adminUser $adminUser `
+                                              -adminPasswd $adminPasswd -sshPublicKeyPath $sshPublicKeyPath
         
         $vm = Get-AzureVM -Name $vmName -ResourceGroupName $resourceGroupName
     }
