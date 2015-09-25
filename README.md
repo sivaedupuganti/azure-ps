@@ -6,13 +6,15 @@ AzNetQOS.ps1 is a tool to measure network bandwidth between two Azure VMs of a s
 Example:
 > To run a test between two "Standard_D4" type VMs in "Classic" mode.
 ```
+# Change to the directory containing the repo files
 .\AzNetQOS.ps1 -subscriptionId "<subscription_id>" -serviceName "<temporary_service_name>" `
                  -instanceSize "Standard_D4" -configMode "ASM" -osType "Windows" -adminPasswd "<admin_password>"
 ```
 
 > To run a test between two "Standard_D4" type VMs in "ARM" mode.
 ```
-  .\AzNetQOS.ps1 -subscriptionId "<subscription_id>" -serviceName "<temporary_service_name>" `
+# Change to the directory containing the repo files
+.\AzNetQOS.ps1 -subscriptionId "<subscription_id>" -serviceName "<temporary_service_name>" `
                  -instanceSize "Standard_D4" -configMode "ARM" -osType "Windows" -adminPasswd "<admin_password>"
 ```
 
