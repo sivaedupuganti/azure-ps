@@ -391,10 +391,11 @@ Function New-BandwidthTest()
 
     # Start NTTTCP on Receiver
     Write-Verbose "Starting ntttcp.exe on receiver"
+    
     Invoke-Command -session $vmSessions[$receiverVMName] -scriptblock {
         param($remotePath, $receiverIpAddress)
         Start-Process $remotePath "-r -m 32,*,$receiverIpAddress -t 300"
-    } -ArgumentList $remotePath, $receiverIpAddress
+    } -ArgumentList $remotePath, "0.0.0.0"
     
     # Start NTTTCP on Sender
     Write-Verbose "Starting ntttcp.exe on sender"
