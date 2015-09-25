@@ -194,7 +194,8 @@ ForEach ($vmName in $vmNames)
 
 # Execute test from VM1 to VM0
 Get-AzureVMSession -vmNames $vmNames -serviceName $serviceName -vmSessions $vmSessions -credential $credential -configMode $configMode
-$result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[0] -senderVMName $vmNames[1] -vmSessions $vmSessions -configMode $configMode
+$result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[0] -senderVMName $vmNames[1] `
+                            -vmSessions $vmSessions -configMode $configMode -credential $credential
 
 if ($result) {
     Write-Host ("Sender bandwidth (Gbps): {0}, Receiver bandwidth (Gbps): {1}" -f $result["sentGbps"], $result["receivedGbps"])
@@ -204,7 +205,8 @@ if ($result) {
 
 # Execute test from VM0 to VM1
 Get-AzureVMSession -vmNames $vmNames -serviceName $serviceName -vmSessions $vmSessions -credential $credential -configMode $configMode
-$result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[1] -senderVMName $vmNames[0] -vmSessions $vmSessions -configMode $configMode
+$result = New-BandwidthTest -serviceName $serviceName -receiverVMName $vmNames[1] -senderVMName $vmNames[0] `
+                            -vmSessions $vmSessions -configMode $configMode -credential $credential
 
 if ($result) {
     Write-Host ("Sender bandwidth (Gbps): {0}, Receiver bandwidth (Gbps): {1}" -f $result["sentGbps"], $result["receivedGbps"])

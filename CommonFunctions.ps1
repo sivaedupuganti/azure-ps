@@ -60,6 +60,7 @@ Function InstallWinRMCertificateForVM()
 # Ref: http://ss64.com/ps/syntax-get-bandwidth.html
 Function Get-RemoteVMBandwidth()
 {
+    [CmdletBinding()]
     param($psSession, $duration = 0.5)
 
     $startTime = get-date
@@ -103,6 +104,7 @@ Function Get-RemoteVMBandwidth()
     $avgReceivedGbps = $avgReceivedBps / [math]::pow(10,9)
     $avgSentGbps     = $avgSentBps / [math]::pow(10,9)
 
+    Write-Verbose ("Bandwidth statistics: sent {0}, received {1}" -f $avgSentGbps, $avgReceivedGbps )
     $result = @{'receivedGbps' = $avgReceivedGbps; 'sentGbps' = $avgSentGbps }
 
     return $result

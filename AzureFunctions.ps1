@@ -353,7 +353,8 @@ Function New-BandwidthTest()
           [parameter(mandatory=$true)][string] $senderVMName,
           [parameter(mandatory=$true)][string] $receiverVMName,
           [parameter(mandatory=$true)][string] $configMode, 
-          [parameter(mandatory=$true)] $vmSessions)
+          [parameter(mandatory=$true)] $vmSessions,
+          $credential)
    
     # Copy NTTTCP to VMs
     $localPath=".\NTttcp-v5.31\x64\ntttcp.exe"
@@ -401,18 +402,31 @@ Function New-BandwidthTest()
     Write-Verbose "Starting ntttcp.exe on sender"
     Invoke-Command -session $vmSessions[$senderVMName] -scriptblock {
         param($remotePath, $receiverIpAddress)
-        Start-Process -FilePath $remotePath "-s -m 32,*,$receiverIpAddress -t 300"
+        Start-Process -FilePath $remotePath "-s -m 32,*,$receiverIpAddress -t 120"
     } -ArgumentList $remotePath, $receiverIpAddress
     
 
     # Wait for a few seconds for traffic to ramp up
-    Start-Sleep -S 30
+    Start-Sleep -S 15
+
+    # Refresh VM sessions if required
+    Get-AzureVMSession -vmNames @($senderVMName, $receiverVMName) -serviceName $serviceName -vmSessions $vmSessions `
+                       -credential $credential -configMode $configMode
 
     # Measure Network statistics on sender 
     $senderBW = Get-RemoteVMBandwidth -psSession $vmSessions[$senderVMName] -duration 0.1
+    Write-Verbose ("Sender bandwidth statistics: sent {0}, received {0}" -f $senderBW['sentGbps'], $senderBW['receivedGbps'])
 
     # Measure Network statistics on receiver
     $receiverBW = Get-RemoteVMBandwidth -psSession $vmSessions[$receiverVMName] -duration 0.1
+    Write-Verbose ("Receiver bandwidth statistics: sent {0}, received {0}" -f $receiverBW['sentGbps'], $receiverBW['receivedGbps'])
+
+    # Stop NTTTCP on VMs
+    Write-Verbose "Stopping ntttcp.exe on sender"
+    Invoke-Command -Session $vmSessions[$senderVMName] -ScriptBlock { Get-Process "ntttcp*" | Stop-Process }
+
+    Write-Verbose "Stopping ntttcp.exe on receiver"
+    Invoke-Command -Session $vmSessions[$receiverVMName] -ScriptBlock { Get-Process "ntttcp*" | Stop-Process }
 
     return @{"sentGbps" = $senderBW['sentGbps']; "receivedGbps" = $receiverBW['receivedGbps']}
 }
@@ -491,7 +505,7 @@ Function New-TestVMInVnet()
     # Setup Resource Group
     $resourceGroup = Get-AzureResourceGroup -Name $resourceGroupName -ErrorAction SilentlyContinue
     if (!$resourceGroup) {
-        New-AzureResourceGroup -Name $resourceGroupName -Location $location
+        $resourceGroup = New-AzureResourceGroup -Name $resourceGroupName -Location $location
     }
 
     # Check if VM already exists
@@ -596,9 +610,7 @@ Function New-TestVMInVnet()
     $vm = Set-AzureVMOSDisk -VM $vm -Name $osDiskName -VhdUri $osDiskUri -CreateOption FromImage
 
     ## Create the VM
-    New-AzureVM -VM $vm -ResourceGroupName $resourceGroupName -Location $location 
-
-    return
+    $vm = New-AzureVM -VM $vm -ResourceGroupName $resourceGroupName -Location $location 
 }
 
 Function Get-AzureVMPublicIpAddress()
