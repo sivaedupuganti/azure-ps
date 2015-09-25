@@ -634,9 +634,7 @@ Function Remove-TestService()
         }
     }
     else {
-        $resourceGroupName = "{0}-rg" -f $serviceName
-
         # Resource Group
-        Remove-AzureResourceGroup -Name $resourceGroupName
+        Remove-AzureResourceGroup -Name $serviceName -Force
     }
 }
