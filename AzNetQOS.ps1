@@ -1,9 +1,35 @@
 ﻿<#
 .SYNOPSIS
-  Execute a network bandwidth test between two Azure VMs
+  Measures network bandwidth between two Azure VMs of a specific instance size. It can be used to compare network performance on various instance sizes, both in ASM(Classic) or ARM modes.
+
+.DESCRIPTION
+  Measures network bandwidth between two Azure VMs of a specific instance size. It can be used to compare network performance on various instance sizes, both in ASM(Classic) or ARM modes.
+
+  In ASM mode,
+  * [Only in the first run] Creates a common storage account for all ASM runs
+  * Creates a new cloud service
+  * Deploys two VMs of the specified instance size
+  * Updates the VMs - enable RSS, increase Recv/Send buffer sizes and create firewall rules
+  * Installs the WinRM certificate of the VM locally for PSSession access
+  * Initiates a bandwidth test
+
+  In ARM mode,
+  * [Only in the first run] Creates a common resource group, key vault and a VM certificate secret to be used as WinRMHttps certUrl during VM creation.
+  * Creates a new resource group, new storage account in the resource group
+  * Creates a VNET, a default subnet
+  * Creates two VMs in the same subnet
+  * Updates the VMs - enable RSS, increase Recv/Send buffer sizes
+  * Initiates a bandwidth test
+
+  For the bandwidth test
+  * Create powershell sessions as necessary
+  * Copy ntttcp.exe to the VMs
+  * Start the process on both receiver & sender VMs
+  * Gather network adapter statistics to measure sent/received bandwidth
+
 .EXAMPLE
-  .\AzNetQOS.ps1 -subscriptionId "<subscription-id>" -serviceName "<Uniq name of cloud service>" `
-                 -adminPasswd "<a complex password>" -instanceSize "Standard_D4" 
+  .\AzNetQOS.ps1 -subscriptionId "<subscription-id>" -serviceName "<Uniq name of cloud service>" -osType "OS Type" `
+                 -adminPasswd "<a complex password>" -instanceSize "Standard_D4" -configMode "<Azure Mode>"
 #>
 
 param(
