@@ -169,7 +169,7 @@ ForEach ($vmName in $vmNames) {
 
 ## TODO: Find fix to verify WinRM state
 ## New-PSSession fails with "The WinRM client cannot process the request because the server name cannot be resolved"
-$waitTime = 120
+$waitTime = 60
 Write-Verbose "Waiting $waitTime seconds for the service to be fully provisioned."
 Start-Sleep -s $waitTime
 
