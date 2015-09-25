@@ -167,6 +167,12 @@ ForEach ($vmName in $vmNames) {
     Write-Verbose "VM $vmName in ready state"
 }
 
+## TODO: Find fix to verify WinRM state
+## New-PSSession fails with "The WinRM client cannot process the request because the server name cannot be resolved"
+$waitTime = 120
+Write-Verbose "Waiting $waitTime seconds for the service to be fully provisioned."
+Start-Sleep -s $waitTime
+
 # Get PS sessions to the VMs
 $vmSessions = @{}
 Get-AzureVMSession -vmNames $vmNames -serviceName $serviceName -vmSessions $vmSessions -credential $credential -configMode $configMode

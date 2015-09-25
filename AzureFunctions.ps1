@@ -215,7 +215,7 @@ Function New-TestVM()
     }
 
     # Install WinRM ceritifcate for the VM locally
-    InstallWinRMCertificateForVM -CloudServiceName $ServiceName -Name $Name
+    InstallWinRMCertificateForVM -CloudServiceName $ServiceName -Name $vmName
 
     return $vm
 }
