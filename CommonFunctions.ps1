@@ -31,8 +31,15 @@ Function InstallWinRMCertificateForVM()
 	}
 	
     Write-Host "Installing WinRM Certificate for remote access: $CloudServiceName $Name"
-	$WinRMCert = (Get-AzureVM -ServiceName $CloudServiceName -Name $Name | select -ExpandProperty vm).DefaultWinRMCertificateThumbprint
-	$AzureX509cert = Get-AzureCertificate -ServiceName $CloudServiceName -Thumbprint $WinRMCert -ThumbprintAlgorithm sha1
+	$vmProperties = Get-AzureVM -ServiceName $CloudServiceName -Name $Name | select -ExpandProperty vm 
+
+    if (!$vmProperties) {
+        Write-Error "Cannot install WinRM cert for $Name. VM properties not available"
+        return
+    }
+
+    $certThumbprint = $vmProperties.DefaultWinRMCertificateThumbprint
+	$AzureX509cert = Get-AzureCertificate -ServiceName $CloudServiceName -Thumbprint $certThumbprint -ThumbprintAlgorithm sha1
 
 	$certTempFile = [IO.Path]::GetTempFileName()
 	$AzureX509cert.Data | Out-File $certTempFile
